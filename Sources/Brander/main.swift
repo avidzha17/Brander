@@ -8,55 +8,27 @@ if #available(OSX 10.12, *) {
         .appendingPathComponent("temp")
         .appendingPathExtension("txt")
 
-
-    // make sure the file exists
     guard FileManager.default.fileExists(atPath: fileUrl.path) else {
-        preconditionFailure("file expected at \(fileUrl.absoluteString) is missing")
-    }
-
-    // open the file for reading
-    // note: user should be prompted the first time to allow reading from this location
-    guard let filePointer:UnsafeMutablePointer<FILE> = fopen(fileUrl.path,"r") else {
-        preconditionFailure("Could not open file at \(fileUrl.absoluteString)")
-    }
-
-    // a pointer to a null-terminated, UTF-8 encoded sequence of bytes
-    var lineByteArrayPointer: UnsafeMutablePointer<CChar>? = nil
-
-    // the smallest multiple of 16 that will fit the byte array for this line
-    var lineCap: Int = 0
-
-    // initial iteration
-    var bytesRead = getline(&lineByteArrayPointer, &lineCap, filePointer)
-
-    defer {
-        // remember to close the file when done
-        fclose(filePointer)
+        preconditionFailure("\(fileUrl.absoluteString) is missing")
     }
     
-    var fileLines = [[Int]]()
-    
-    while (bytesRead > 0) {
-        // note: this translates the sequence of bytes to a string using UTF-8 interpretation
-        let lineAsString = String.init(cString:lineByteArrayPointer!)
+    var inputData = [[Int]]()
+    do {
+        let textOfFile = try String(contentsOf: fileUrl)
         
-        // do whatever you need to do with this single line of text
-        // for debugging, can print it
-        
-        
-        let cleanLine = String(lineAsString.filter { !"\n\t".contains($0) } )
-        let numbers = cleanLine.transformToArrayOfInt()
-        fileLines.append(numbers)
-
-        // updates number of bytes read, for the next iteration
-        bytesRead = getline(&lineByteArrayPointer, &lineCap, filePointer)
+        for line in textOfFile.split(separator: "\n") {
+            let intRepresentationOfFile = String(line.filter { !"\t".contains($0) }).transformToArrayOfInt()
+            inputData.append(intRepresentationOfFile)
+        }
+    } catch let error as NSError {
+        print(error)
     }
     
-    let numberOfRows = fileLines[0].first!
-    let numberOfColumns = fileLines[1].first!
-    let startPointCoordinates = fileLines[2].map {$0 - 1}
-    let endPointCoordinates = fileLines[3].map {$0 - 1}
-    var linesForMatrix = fileLines.suffix(9)
+    let numberOfRows = inputData[0].first!
+    let numberOfColumns = inputData[1].first!
+    let startPointCoordinates = inputData[2].map {$0 - 1}
+    let endPointCoordinates = inputData[3].map {$0 - 1}
+    var linesForMatrix = inputData.suffix(9)
     
     var matrixOfZerosAndOnes = [[Int]]()
     for _ in linesForMatrix {
@@ -78,7 +50,7 @@ if #available(OSX 10.12, *) {
             }
         }
     }
-    
+        
     var cellsWithDistance = Set<[Int]>()
     cellsWithDistance.insert(startPointCoordinates)
     
@@ -123,6 +95,8 @@ if #available(OSX 10.12, *) {
         distanceToEndPoint += 1
         amountOfRowsWithZeros = matrixOfDistance.filter({ $0.contains(0) })
     }
+    
+
     
     var pathToStartPoint = [String]()
     
@@ -169,13 +143,8 @@ if #available(OSX 10.12, *) {
         }
         return newCell
     }
-
-    var endPointOfPath = endPointCoordinates
-    if matrixOfDistance[endPointCoordinates[0]][endPointCoordinates[1]] != 0 {
-        while endPointOfPath != startPointCoordinates {
-            endPointOfPath = getNextCell(byCell: endPointOfPath)
-        }
-        
+    
+    func resultOutput() {
         let pathToEndPoint = pathToStartPoint.reversed().map { direction ->  String in
             switch direction {
             case "U": return "D"
@@ -189,11 +158,20 @@ if #available(OSX 10.12, *) {
         resultMatrix[endPointCoordinates[0]][endPointCoordinates[1]] = "F"
         resultMatrix[startPointCoordinates[0]][startPointCoordinates[1]] = "S"
 
-        for line in matrixOfDistance {
+        for line in resultMatrix {
             print(line)
         }
-        print(pathToEndPoint)
-        print("lenght of path:", pathToEndPoint.count)
+        
+        print("\n",pathToEndPoint)
+        print("\n lenght of the path:", pathToEndPoint.count)
+    }
+
+    var endPointOfPath = endPointCoordinates
+    if matrixOfDistance[endPointCoordinates[0]][endPointCoordinates[1]] != 0, matrixOfZerosAndOnes[startPointCoordinates[0]][startPointCoordinates[1]] == 1, matrixOfZerosAndOnes[endPointCoordinates[0]][endPointCoordinates[1]] == 0 {
+        while endPointOfPath != startPointCoordinates {
+            endPointOfPath = getNextCell(byCell: endPointOfPath)
+        }
+        resultOutput()
     } else {
         print("there is no path")
     }
