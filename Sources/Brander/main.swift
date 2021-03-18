@@ -2,12 +2,12 @@ import Cocoa
 
 if #available(OSX 10.12, *) {
     let homeDirectory = FileManager.default.homeDirectoryForCurrentUser
-
+    
     let fileUrl = homeDirectory
         .appendingPathComponent("Desktop")
         .appendingPathComponent("temp")
         .appendingPathExtension("txt")
-
+    
     guard FileManager.default.fileExists(atPath: fileUrl.path) else {
         preconditionFailure("\(fileUrl.absoluteString) is missing")
     }
