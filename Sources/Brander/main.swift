@@ -34,7 +34,7 @@ if #available(OSX 10.12, *) {
         fclose(filePointer)
     }
     
-    var lines = [[Int]]()
+    var fileLines = [[Int]]()
     
     while (bytesRead > 0) {
         // note: this translates the sequence of bytes to a string using UTF-8 interpretation
@@ -46,122 +46,124 @@ if #available(OSX 10.12, *) {
         
         let cleanLine = String(lineAsString.filter { !"\n\t".contains($0) } )
         let numbers = cleanLine.transformToArrayOfInt()
-        lines.append(numbers)
+        fileLines.append(numbers)
 
         // updates number of bytes read, for the next iteration
         bytesRead = getline(&lineByteArrayPointer, &lineCap, filePointer)
     }
     
-    let numberOfRows = lines[0].first!
-    let numberOfColumns = lines[1].first!
-    var startPointCoordinates = lines[2]
-    startPointCoordinates[0] -= 1
-    startPointCoordinates[1] -= 1
-    var endPointCoordinates = lines[3]
-    endPointCoordinates[0] -= 1
-    endPointCoordinates[1] -= 1
-    var gridLines = lines.suffix(9)
+    let numberOfRows = fileLines[0].first!
+    let numberOfColumns = fileLines[1].first!
+    let startPointCoordinates = fileLines[2].map {$0 - 1}
+    let endPointCoordinates = fileLines[3].map {$0 - 1}
+    var linesForMatrix = fileLines.suffix(9)
     
-    var grid = [[Int]]()
-    for _ in gridLines {
-        if let gridRow = gridLines.popFirst() {
-            grid.append(gridRow)
+    var matrixOfZerosAndOnes = [[Int]]()
+    for _ in linesForMatrix {
+        if let matrixRow = linesForMatrix.popFirst() {
+            matrixOfZerosAndOnes.append(matrixRow)
         }
     }
     
     let cellWithBall = 100
-    var gridOfDistance = Array(repeating: Array(repeating: 0, count: numberOfColumns), count: numberOfRows)
-    var resultGrid = Array(repeating: Array(repeating: " ", count: numberOfColumns), count: numberOfRows)
+    
+    var matrixOfDistance = Array(repeating: Array(repeating: 0, count: numberOfColumns), count: numberOfRows)
+    var resultMatrix = Array(repeating: Array(repeating: " ", count: numberOfColumns), count: numberOfRows)
+    
     for row in 0...numberOfRows - 1 {
         for column in 0...numberOfColumns - 1 {
-            if grid[row][column] == 1 {
-                gridOfDistance[row][column] = cellWithBall
-                resultGrid[row][column] = "O"
+            if matrixOfZerosAndOnes[row][column] == 1 {
+                matrixOfDistance[row][column] = cellWithBall
+                resultMatrix[row][column] = "O"
             }
         }
     }
     
     var cellsWithDistance = Set<[Int]>()
     cellsWithDistance.insert(startPointCoordinates)
-    gridOfDistance[startPointCoordinates.first!][startPointCoordinates.last!] = 0
+    
+    matrixOfDistance[startPointCoordinates.first!][startPointCoordinates.last!] = 0
     var distanceToEndPoint = 1
 
-    func addToTheGridNumbersOfDistance(_ grid: [[Int]]) -> [[Int]] {
-        var newGrid = Array(repeating: Array(repeating: 0, count: numberOfColumns), count: numberOfRows)
+    func addDistance(toMatrixOfDistance matrix: [[Int]]) -> [[Int]] {
+        var newMatrixOfDistance = Array(repeating: Array(repeating: 0, count: numberOfColumns), count: numberOfRows)
         var newCellsWithDistancePerIteration = Set<[Int]>()
         
         for row in 0...numberOfRows - 1 {
             for column in 0...numberOfColumns - 1 {
                 
-                let cell = [row, column]
+                let currentCell = [row, column]
+                                
                 let downCell = [row + 1, column]
                 let upperCell = [row - 1, column]
                 let rightCell = [row, column + 1]
                 let leftCell = [row, column - 1]
                 let adjacentCells = Set(arrayLiteral: downCell, upperCell, rightCell, leftCell)
     
-                let intersecion = Array(adjacentCells.intersection(cellsWithDistance))
+                let adjacentCellsWithDistance = Array(adjacentCells.intersection(cellsWithDistance))
     
-                if grid[row][column] != cellWithBall, !cellsWithDistance.contains(cell), !intersecion.isEmpty {
-                    newGrid[row][column] = distanceToEndPoint
-                    newCellsWithDistancePerIteration.insert(cell)
-                } else if grid[row][column] == cellWithBall {
-                    newGrid[row][column] = cellWithBall
+                if matrix[row][column] != cellWithBall, !cellsWithDistance.contains(currentCell), !adjacentCellsWithDistance.isEmpty {
+                    newMatrixOfDistance[row][column] = distanceToEndPoint
+                    newCellsWithDistancePerIteration.insert(currentCell)
+                } else if matrix[row][column] == cellWithBall {
+                    newMatrixOfDistance[row][column] = cellWithBall
                 } else {
-                    newGrid[row][column] = grid[row][column]
+                    newMatrixOfDistance[row][column] = matrix[row][column]
                 }
             }
         }
         cellsWithDistance = cellsWithDistance.union(newCellsWithDistancePerIteration)
-        return newGrid
+        return newMatrixOfDistance
     }
     
-    while distanceToEndPoint < 16 {
-        gridOfDistance = addToTheGridNumbersOfDistance(gridOfDistance)
+    var amountOfRowsWithZeros = matrixOfDistance.filter({ $0.contains(0) })
+    
+    while (matrixOfDistance[endPointCoordinates[0]][endPointCoordinates[1]] == 0 || amountOfRowsWithZeros.count > 1) {
+        matrixOfDistance = addDistance(toMatrixOfDistance: matrixOfDistance)
         distanceToEndPoint += 1
+        amountOfRowsWithZeros = matrixOfDistance.filter({ $0.contains(0) })
     }
     
-    var returnPath = [String]()
+    var pathToStartPoint = [String]()
+    
     func getNextCell(byCell cell: [Int]) -> [Int] {
-        var newCell = [Int]()
-        var upperCell = Int()
-        var downCell = Int()
-        var rightCell = Int()
-        var leftCell = Int()
+        
         var adjacentCells = Dictionary<String, Int>()
 
         if cell[0] - 1 >= 0 {
-            upperCell = gridOfDistance[cell[0] - 1][cell[1]]
+            let upperCell = matrixOfDistance[cell[0] - 1][cell[1]]
             adjacentCells["U"] = upperCell
         }
         if cell[0] + 1 <= 8 {
-            downCell = gridOfDistance[cell[0] + 1][cell[1]]
+            let downCell = matrixOfDistance[cell[0] + 1][cell[1]]
             adjacentCells["D"] = downCell
         }
         if cell[1] - 1 >= 0 {
-            leftCell = gridOfDistance[cell[0]][cell[1] - 1]
+            let leftCell = matrixOfDistance[cell[0]][cell[1] - 1]
             adjacentCells["L"] = leftCell
         }
         if cell[1] + 1 <= 8 {
-            rightCell = gridOfDistance[cell[0]][cell[1] + 1]
+            let rightCell = matrixOfDistance[cell[0]][cell[1] + 1]
             adjacentCells["R"] = rightCell
         }
-        let valueOfCell = gridOfDistance[cell[0]][cell[1]]
+        let distanceToStartPoint = matrixOfDistance[cell[0]][cell[1]]
         
-        for (name, value) in adjacentCells {
-            if valueOfCell - value == 1 {
-                switch name {
+        var newCell = [Int]()
+
+        for (direction, distance) in adjacentCells {
+            if distanceToStartPoint - distance == 1 {
+                switch direction {
                 case "U": newCell = [cell[0] - 1, cell[1]]
-                    resultGrid[cell[0] - 1][cell[1]] = "D"
+                    resultMatrix[cell[0] - 1][cell[1]] = "D"
                 case "D": newCell = [cell[0] + 1, cell[1]]
-                    resultGrid[cell[0] + 1][cell[1]] = "U"
+                    resultMatrix[cell[0] + 1][cell[1]] = "U"
                 case "L": newCell = [cell[0], cell[1] - 1]
-                    resultGrid[cell[0]][cell[1] - 1] = "R"
+                    resultMatrix[cell[0]][cell[1] - 1] = "R"
                 case "R": newCell = [cell[0], cell[1] + 1]
-                    resultGrid[cell[0]][cell[1] + 1] = "L"
+                    resultMatrix[cell[0]][cell[1] + 1] = "L"
                 default: break
                 }
-                returnPath.append(name)
+                pathToStartPoint.append(direction)
                 break
             }
         }
@@ -169,12 +171,12 @@ if #available(OSX 10.12, *) {
     }
 
     var endPointOfPath = endPointCoordinates
-    if gridOfDistance[endPointCoordinates[0]][endPointCoordinates[1]] != 0 {
+    if matrixOfDistance[endPointCoordinates[0]][endPointCoordinates[1]] != 0 {
         while endPointOfPath != startPointCoordinates {
             endPointOfPath = getNextCell(byCell: endPointOfPath)
         }
         
-        returnPath = returnPath.reversed().map { direction ->  String in
+        let pathToEndPoint = pathToStartPoint.reversed().map { direction ->  String in
             switch direction {
             case "U": return "D"
             case "D": return "U"
@@ -184,20 +186,17 @@ if #available(OSX 10.12, *) {
             }
         }
         
-        resultGrid[endPointCoordinates[0]][endPointCoordinates[1]] = "F"
-        resultGrid[startPointCoordinates[0]][startPointCoordinates[1]] = "S"
+        resultMatrix[endPointCoordinates[0]][endPointCoordinates[1]] = "F"
+        resultMatrix[startPointCoordinates[0]][startPointCoordinates[1]] = "S"
 
-        for line in resultGrid {
+        for line in matrixOfDistance {
             print(line)
         }
-        print(returnPath)
-        print("lenght of path:", returnPath.count)
+        print(pathToEndPoint)
+        print("lenght of path:", pathToEndPoint.count)
     } else {
         print("there is no path")
     }
-
-
-
 }
     
 extension String {
